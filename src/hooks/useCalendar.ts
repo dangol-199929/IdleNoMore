@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import {
+  createCalendarEvent,
   getCalendarPermission,
   listCalendars,
   listEventsForDay,
   requestCalendarPermission,
+  requestCalendarWritePermission,
 } from '../services/calendar';
-import type { AgendaEvent, CalendarStatus } from '../types/calendar';
+import type { AgendaEvent, CalendarStatus, NewEvent } from '../types/calendar';
 import { useAppActive } from './useAppActive';
 
 // The provider is local, so this is a cheap query; it picks up newly synced events.
@@ -27,6 +29,8 @@ const lastState: { current: CalendarState | null } = { current: null };
 export interface CalendarApi extends CalendarState {
   refresh: () => void;
   requestAccess: () => void;
+  /** Adds an event to the phone's calendar; resolves to an error message or null. */
+  addEvent: (event: NewEvent) => Promise<string | null>;
 }
 
 /**
@@ -111,9 +115,26 @@ export function useCalendar(dayKey: string, hiddenCalendarIds: string[]): Calend
     }
   }, [load]);
 
+  const addEvent = useCallback(
+    async (event: NewEvent) => {
+      try {
+        if (!(await requestCalendarWritePermission())) {
+          return 'DeskClock needs calendar access to add events. You can allow it in Android settings.';
+        }
+        await createCalendarEvent(event);
+        await load();
+        return null;
+      } catch (error) {
+        return `The event could not be added (${String(error)}).`;
+      }
+    },
+    [load],
+  );
+
   return {
     ...state,
     refresh: load,
     requestAccess,
+    addEvent,
   };
 }

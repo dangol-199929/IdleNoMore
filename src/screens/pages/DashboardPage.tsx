@@ -45,6 +45,7 @@ interface DashboardPageProps {
   onAddReminder: () => void;
   onOpenCalendar: () => void;
   onOpenReminders: () => void;
+  onAddEvent: () => void;
 }
 
 /** A user-arranged grid of widgets, chosen in Settings › Dashboard. */
@@ -143,6 +144,7 @@ function DashboardWidget({
   onAddReminder,
   onOpenCalendar,
   onOpenReminders,
+  onAddEvent,
 }: DashboardPageProps & { id: WidgetId; size: { width: number; height: number } }) {
   const { colors } = useTheme();
   const { settings } = useSettings();
@@ -186,6 +188,7 @@ function DashboardWidget({
             limit={Math.min(rows, 5)}
             onSelect={onSelectEvent}
             onOpenCalendar={onOpenCalendar}
+            onAddEvent={onAddEvent}
           />
         </View>
       );

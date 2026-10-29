@@ -11,7 +11,7 @@ Swipe left and right between pages (reorder or hide them in Settings › Screens
 | Page | What you see |
 | --- | --- |
 | **Clock** | Huge clock and date. Layouts: *Agenda* (today's events and reminders beside the clock), *Minimal*, *Photo clock*. |
-| **Calendar** | Today's agenda from calendars synced to the phone: now / next / finished, all-day events, refresh, event details. Read-only. |
+| **Calendar** | Today's agenda from calendars synced to the phone: now / next / finished, all-day events, refresh, event details, and **Add event** (title, day, time, duration or all-day, calendar, location). |
 | **Reminders** | Local reminders with date and time, overdue markers, one-tap complete, edit, delete, notifications. |
 | **Photos** | Slideshow of photos you pick with Android's photo picker: interval, pause, fit/fill, clock overlay, crossfade. |
 | **Dashboard** | Grid, Feature or Columns arrangement of widgets: clock, date, agenda, reminders, photo, battery, countdown. |
@@ -84,7 +84,8 @@ src/theme/                   palettes, accents, fonts, type scale, spacing
 
 | Permission | Why | When it's asked |
 | --- | --- | --- |
-| `READ_CALENDAR` | Show today's events | On the Calendar page, after an explanation. Write access is blocked. |
+| `READ_CALENDAR` | Show today's events | On the Calendar page, after an explanation. |
+| `WRITE_CALENDAR` | Add events from the app | The first time you add an event (Android usually grants it silently once reading is allowed). The app only adds events; it never edits or deletes yours. |
 | `POST_NOTIFICATIONS` | Reminder alerts | When you save your first reminder. Reminders still show in the app if denied. |
 | `SCHEDULE_EXACT_ALARM` | On-time reminders | Granted automatically on Android 12–13. |
 
@@ -121,6 +122,7 @@ Tested on the Pixel 3a emulator (Android 14) unless noted:
 - [x] Automatic switch to night mode at 22:00
 - [x] Settings and photos survive an app restart; app reopens on the last page
 - [x] Calendar permission prompt, agenda ordering, all-day events, hide a calendar
+- [x] Add event from the Calendar page: saved to the phone calendar and shown as NEXT
 - [x] Reminder created, notification permission prompt, notification delivered on time
 - [x] Photo picker → slideshow → dashboard photo widget
 - [x] Time-zone change picked up automatically

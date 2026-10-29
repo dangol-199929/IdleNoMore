@@ -43,6 +43,7 @@ interface ClockPageProps {
   onAddReminder: () => void;
   onOpenCalendar: () => void;
   onOpenReminders: () => void;
+  onAddEvent: () => void;
 }
 
 /**
@@ -123,6 +124,7 @@ export function ClockPage(props: ClockPageProps) {
           limit={agendaLimit}
           onSelect={props.onSelectEvent}
           onOpenCalendar={props.onOpenCalendar}
+          onAddEvent={props.onAddEvent}
         />
         <RemindersWidget
           reminders={reminders}

@@ -5,7 +5,7 @@ import { eventTiming } from '../../services/calendar';
 import { spacing, type, useTheme } from '../../theme';
 import type { AgendaEvent } from '../../types/calendar';
 import { formatTime24, formatUntil } from '../../utils/time';
-import { EmptyText, WidgetHeader } from '../ui';
+import { EmptyText, IconButton, WidgetHeader } from '../ui';
 
 interface AgendaWidgetProps {
   calendar: CalendarApi;
@@ -14,6 +14,8 @@ interface AgendaWidgetProps {
   limit: number;
   onSelect: (event: AgendaEvent) => void;
   onOpenCalendar: () => void;
+  /** Shows a "+" in the header when given. */
+  onAddEvent?: () => void;
 }
 
 /** The rest of today at a glance: what's on now and the next few events. */
@@ -23,6 +25,7 @@ export function AgendaWidget({
   limit,
   onSelect,
   onOpenCalendar,
+  onAddEvent,
 }: AgendaWidgetProps) {
   const { colors } = useTheme();
   const remaining = calendar.events.filter((e) => eventTiming(e, now) !== 'past');
@@ -88,20 +91,35 @@ export function AgendaWidget({
 
   return (
     <View>
-      <WidgetHeader
-        title="Today"
-        detail={
-          calendar.lastRefreshed ? `updated ${formatTime24(calendar.lastRefreshed)}` : undefined
-        }
-        onPress={onOpenCalendar}
-        accessibilityLabel="Open calendar"
-      />
+      <View style={styles.header}>
+        <WidgetHeader
+          title="Today"
+          detail={
+            calendar.lastRefreshed ? `updated ${formatTime24(calendar.lastRefreshed)}` : undefined
+          }
+          onPress={onOpenCalendar}
+          accessibilityLabel="Open calendar"
+        />
+        {onAddEvent && calendar.status === 'ready' ? (
+          <View style={styles.add}>
+            <IconButton icon="plus" onPress={onAddEvent} accessibilityLabel="Add event" size={20} />
+          </View>
+        ) : null}
+      </View>
       <View style={styles.body}>{body}</View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  header: {
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  add: {
+    position: 'absolute',
+    right: 0,
+  },
   body: {
     marginTop: spacing.xs,
   },

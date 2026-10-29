@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DeskControls } from '../components/DeskControls';
 import { EventDetails } from '../components/EventDetails';
+import { EventEditor } from '../components/EventEditor';
 import { ReminderEditor } from '../components/ReminderEditor';
 import { NavStrip } from '../components/NavStrip';
 import { IconButton, PageDots } from '../components/ui';
@@ -92,6 +93,7 @@ export function DeskScreen({
   const currentPage = pages[Math.min(page, pages.length - 1)];
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [editing, setEditing] = useState<Reminder | 'new' | null>(null);
+  const [addingEvent, setAddingEvent] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(false);
   const pager = useRef<PagerView>(null);
   const [lastTouch, setLastTouch] = useState(() => Date.now());
@@ -119,7 +121,8 @@ export function DeskScreen({
     pages.includes('photos') &&
     !nightPreview &&
     !selectedEvent &&
-    !editing;
+    !editing &&
+    !addingEvent;
   useEffect(() => {
     if (shouldAutoSlideshow) goTo('photos');
   }, [shouldAutoSlideshow, goTo]);
@@ -214,6 +217,7 @@ export function DeskScreen({
                       onAddReminder={() => setEditing('new')}
                       onOpenCalendar={() => goTo('calendar')}
                       onOpenReminders={() => goTo('reminders')}
+                      onAddEvent={() => setAddingEvent(true)}
                     />
                   ) : key === 'calendar' ? (
                     <CalendarPage
@@ -221,6 +225,7 @@ export function DeskScreen({
                       calendar={calendar}
                       isLandscape={isLandscape}
                       onSelectEvent={setSelectedEvent}
+                      onAddEvent={() => setAddingEvent(true)}
                     />
                   ) : key === 'reminders' ? (
                     <RemindersPage
@@ -244,6 +249,7 @@ export function DeskScreen({
                       onAddReminder={() => setEditing('new')}
                       onOpenCalendar={() => goTo('calendar')}
                       onOpenReminders={() => goTo('reminders')}
+                      onAddEvent={() => setAddingEvent(true)}
                     />
                   )}
                 </View>
@@ -293,6 +299,11 @@ export function DeskScreen({
         />
       </View>
       <EventDetails event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      <EventEditor
+        visible={addingEvent}
+        onSave={calendar.addEvent}
+        onClose={() => setAddingEvent(false)}
+      />
       <ReminderEditor
         target={editing}
         onSave={reminders.save}

@@ -1,6 +1,7 @@
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AgendaList } from '../../components/AgendaList';
+import { PillButton } from '../../components/ui';
 import type { CalendarApi } from '../../hooks/useCalendar';
 import { findNextEvent, eventTiming } from '../../services/calendar';
 import { fonts, spacing, useTheme } from '../../theme';
@@ -12,9 +13,16 @@ interface CalendarPageProps {
   calendar: CalendarApi;
   isLandscape: boolean;
   onSelectEvent: (event: AgendaEvent) => void;
+  onAddEvent: () => void;
 }
 
-export function CalendarPage({ now, calendar, isLandscape, onSelectEvent }: CalendarPageProps) {
+export function CalendarPage({
+  now,
+  calendar,
+  isLandscape,
+  onSelectEvent,
+  onAddEvent,
+}: CalendarPageProps) {
   const { colors } = useTheme();
   const next = findNextEvent(calendar.events, now);
   const remaining = calendar.events.filter((e) => eventTiming(e, now) !== 'past').length;
@@ -43,6 +51,9 @@ export function CalendarPage({ now, calendar, isLandscape, onSelectEvent }: Cale
         ) : null}
         {calendar.status === 'ready' || calendar.status === 'error' ? (
           <View style={styles.refreshRow}>
+            {calendar.status === 'ready' ? (
+              <PillButton label="Add event" icon="plus" variant="accent" onPress={onAddEvent} />
+            ) : null}
             <Pressable
               onPress={calendar.refresh}
               disabled={calendar.refreshing}
@@ -58,12 +69,17 @@ export function CalendarPage({ now, calendar, isLandscape, onSelectEvent }: Cale
                 {calendar.refreshing ? 'Refreshing…' : 'Refresh'}
               </Text>
             </Pressable>
-            {calendar.lastRefreshed ? (
+            {calendar.lastRefreshed && !isLandscape ? (
               <Text style={[styles.updated, { color: colors.faint }]}>
                 Updated {formatTime24(calendar.lastRefreshed)}
               </Text>
             ) : null}
           </View>
+        ) : null}
+        {calendar.lastRefreshed && isLandscape ? (
+          <Text style={[styles.updated, styles.updatedBelow, { color: colors.faint }]}>
+            Updated {formatTime24(calendar.lastRefreshed)}
+          </Text>
         ) : null}
       </View>
 
@@ -210,6 +226,9 @@ const styles = StyleSheet.create({
   refreshText: {
     fontFamily: fonts.regular,
     fontSize: 14,
+  },
+  updatedBelow: {
+    marginTop: spacing.sm,
   },
   updated: {
     fontFamily: fonts.regular,

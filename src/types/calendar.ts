@@ -19,6 +19,18 @@ export interface CalendarSummary {
   title: string;
   account: string;
   color: string | null;
+  /** True if new events can be added to it (owned or editable). */
+  writable: boolean;
+  isPrimary: boolean;
+}
+
+export interface NewEvent {
+  calendarId: string;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  location: string | null;
 }
 
 export type CalendarStatus =

@@ -1,12 +1,21 @@
 import * as Calendar from 'expo-calendar';
 import { PermissionsAndroid, Platform } from 'react-native';
 
-import type { AgendaEvent, CalendarSummary, EventTiming } from '../types/calendar';
+import type { AgendaEvent, CalendarSummary, EventTiming, NewEvent } from '../types/calendar';
 
-// Reading events only needs READ_CALENDAR. expo-calendar's own permission
-// request also asks for WRITE_CALENDAR, which this app never uses, so on
-// Android we ask for read access directly (WRITE_CALENDAR is blocked in app.json).
+// Reading events only needs READ_CALENDAR; write access is asked for separately,
+// the first time the user adds an event. Both belong to Android's "Calendar"
+// permission group, so once reading is allowed, Android grants writing without
+// showing a second prompt.
 const READ = PermissionsAndroid.PERMISSIONS.READ_CALENDAR;
+const WRITE = PermissionsAndroid.PERMISSIONS.WRITE_CALENDAR;
+
+const WRITABLE_LEVELS = new Set<string>([
+  Calendar.CalendarAccessLevel.OWNER,
+  Calendar.CalendarAccessLevel.EDITOR,
+  Calendar.CalendarAccessLevel.CONTRIBUTOR,
+  Calendar.CalendarAccessLevel.ROOT,
+]);
 
 export type PermissionState = 'granted' | 'undetermined' | 'denied' | 'blocked';
 
@@ -29,6 +38,16 @@ export async function requestCalendarPermission(): Promise<PermissionState> {
   return result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ? 'blocked' : 'denied';
 }
 
+/** Asks for permission to add events. Returns true if granted. */
+export async function requestCalendarWritePermission(): Promise<boolean> {
+  if (Platform.OS !== 'android') {
+    const { status } = await Calendar.requestCalendarPermissions();
+    return status === 'granted';
+  }
+  if (await PermissionsAndroid.check(WRITE)) return true;
+  return (await PermissionsAndroid.request(WRITE)) === PermissionsAndroid.RESULTS.GRANTED;
+}
+
 export async function listCalendars(): Promise<CalendarSummary[]> {
   const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
   return calendars
@@ -38,6 +57,8 @@ export async function listCalendars(): Promise<CalendarSummary[]> {
       title: c.title || c.name || 'Untitled calendar',
       account: c.source?.name ?? c.ownerAccount ?? '',
       color: c.color ?? null,
+      writable: c.allowsModifications && (!c.accessLevel || WRITABLE_LEVELS.has(c.accessLevel)),
+      isPrimary: c.isPrimary === true,
     }))
     .sort((a, b) => a.account.localeCompare(b.account) || a.title.localeCompare(b.title));
 }
@@ -128,4 +149,39 @@ export function findNextEvent(events: AgendaEvent[], now: Date): AgendaEvent | n
 /** Timed events in progress right now. */
 export function findCurrentEvents(events: AgendaEvent[], now: Date): AgendaEvent[] {
   return events.filter((e) => !e.allDay && eventTiming(e, now) === 'current');
+}
+
+/** Midnight UTC of the local calendar day, as Android expects for all-day events. */
+function utcMidnight(date: Date): Date {
+  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+}
+
+/**
+ * Adds an event to one of the phone's calendars. For a Google calendar it then
+ * syncs to Google like any event created on the phone.
+ */
+export async function createCalendarEvent(event: NewEvent): Promise<void> {
+  const calendar = await Calendar.ExpoCalendar.get(event.calendarId);
+  const base = {
+    title: event.title,
+    location: event.location ?? undefined,
+  };
+  if (event.allDay) {
+    const day = utcMidnight(event.start);
+    await calendar.createEvent({
+      ...base,
+      allDay: true,
+      startDate: day,
+      endDate: new Date(day.getTime() + 24 * 60 * 60 * 1000),
+      timeZone: 'UTC',
+    });
+  } else {
+    await calendar.createEvent({
+      ...base,
+      allDay: false,
+      startDate: event.start,
+      endDate: event.end,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+  }
 }
