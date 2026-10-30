@@ -66,9 +66,10 @@ export function ClockPage(props: ClockPageProps) {
 
   // Only show side widgets that have something in them; an empty "Today" or
   // "Reminders" section is just clutter on a desk display.
+  // Commute: today's trips in their window, or tomorrow's once today's are done.
   const showCommute =
     settings.commuteOnClock &&
-    props.commute.anyInWindow &&
+    (props.commute.anyInWindow || props.commute.dayOffset === 1) &&
     props.commute.trips.some((t) => t.configured);
   const showAgenda = calendar.status === 'ready' && calendar.events.some((e) => e.end > now);
   const showReminders = reminders.some((r) => !r.completedAt);

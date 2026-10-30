@@ -59,6 +59,32 @@ export function schedulesForToday(schedules: CommuteSchedule[], now: Date): Comm
   return [...chosen].sort((a, b) => a.arriveBy - b.arriveBy || a.name.localeCompare(b.name));
 }
 
+/** The schedules to follow next, and the Sydney day they are for. */
+export interface CommuteDay {
+  schedules: CommuteSchedule[];
+  /** An instant inside that Sydney calendar day (its noon). */
+  day: Date;
+  /** 0 = today, 1 = tomorrow, … */
+  offset: number;
+}
+
+/**
+ * Today's commutes that haven't reached their arrival time yet. Once they all
+ * have (or none run today), the next day that has any, up to a week ahead.
+ */
+export function nextCommuteDay(schedules: CommuteSchedule[], now: Date): CommuteDay {
+  // Noon steps stay inside the right calendar day across daylight-saving changes.
+  const noon = sydneyTimeOn(now, 12 * 60).getTime();
+  for (let offset = 0; offset <= 7; offset++) {
+    const day = new Date(noon + offset * 24 * 60 * 60_000);
+    const due = schedulesForToday(schedules, day).filter(
+      (s) => offset > 0 || sydneyTimeOn(day, s.arriveBy) >= now,
+    );
+    if (due.length > 0) return { schedules: due, day, offset };
+  }
+  return { schedules: [], day: now, offset: 0 };
+}
+
 export const departureOf = (j: Journey) => j.departEstimated ?? j.departPlanned;
 export const arrivalOf = (j: Journey) => j.arriveEstimated ?? j.arrivePlanned;
 
@@ -75,7 +101,7 @@ export interface CommutePlan {
   leaveHomeAt: Date | null;
   /** Expected arrival at the workplace (journey arrival + walk at the end). */
   arriveWorkAt: Date | null;
-  /** Required arrival at work, today. */
+  /** Required arrival at work on the commute's day. */
   deadline: Date;
   /** Minutes the recommended journey is expected to be late (only when running late). */
   lateByMinutes: number;
@@ -98,8 +124,9 @@ export function planCommute(
   schedule: CommuteSchedule,
   journeys: Journey[],
   now: Date,
+  day: Date = now,
 ): CommutePlan {
-  const deadline = sydneyTimeOn(now, schedule.arriveBy);
+  const deadline = sydneyTimeOn(day, schedule.arriveBy);
   const target = new Date(deadline.getTime() - schedule.buffer * 60000);
   const leaveAt = (j: Journey) => new Date(departureOf(j).getTime() - schedule.walkToStart * 60000);
   const arriveWork = (j: Journey) =>

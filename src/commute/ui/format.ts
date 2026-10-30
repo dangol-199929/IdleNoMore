@@ -1,4 +1,5 @@
 import type { CommutePlan } from '../engine';
+import { SYDNEY_TZ } from '../transportApi';
 import type { Journey, Leg } from '../types';
 
 export function minutesUntil(target: Date, now: Date): number {
@@ -76,4 +77,11 @@ export function platformOf(stopName: string): string | null {
 /** "Parramatta Station, Platform 1" → "Parramatta Station". */
 export function stationOf(stopName: string): string {
   return stopName.split(',')[0].trim();
+}
+
+/** "Today", "Tomorrow" or the weekday ("Monday") of a commute day, in Sydney. */
+export function dayLabel(day: Date, offset: number): string {
+  if (offset === 0) return 'Today';
+  if (offset === 1) return 'Tomorrow';
+  return new Intl.DateTimeFormat('en-AU', { weekday: 'long', timeZone: SYDNEY_TZ }).format(day);
 }

@@ -5,10 +5,11 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSettings } from '../../hooks/useSettings';
 import { fonts, spacing, type, useTheme } from '../../theme';
 import { formatClock } from '../../utils/time';
-import { arrivalOf, departureOf, hasSeriousAlert, sydneyTimeOn } from '../engine';
+import { arrivalOf, departureOf, hasSeriousAlert } from '../engine';
 import type { Journey, Leg } from '../types';
 import type { TripState } from '../useCommute';
 import {
+  dayLabel,
   delayMinutes,
   leaveLabel,
   lineColour,
@@ -50,15 +51,22 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
   const time = (d: Date) => formatClock(d, settings.clockFormat);
   const [open, setOpen] = useState<Journey | null>(null);
   const { schedule, plan } = trip;
-  const deadline = sydneyTimeOn(now, schedule.arriveBy);
+  const { deadline } = trip;
+  // A later day's trip (usually tomorrow's): timetable times, no countdowns.
+  const ahead = trip.dayOffset > 0;
   const windowStart = new Date(deadline.getTime() - 3 * 60 * 60_000);
 
   // Show the recommended departure with one earlier and one later option around
   // it, in time order, so the row that matters is always on screen.
+  // For a later day, skip options hours earlier (night trains) than the pick.
+  const recommendedAt = plan?.recommended ? departureOf(plan.recommended).getTime() : 0;
   const sorted = plan?.recommended
-    ? [plan.recommended, ...plan.alternatives].sort(
-        (a, b) => departureOf(a).getTime() - departureOf(b).getTime(),
-      )
+    ? [
+        plan.recommended,
+        ...plan.alternatives.filter(
+          (j) => !ahead || departureOf(j).getTime() >= recommendedAt - 60 * 60_000,
+        ),
+      ].sort((a, b) => departureOf(a).getTime() - departureOf(b).getTime())
     : [];
   const recommendedIndex = plan?.recommended ? sorted.indexOf(plan.recommended) : 0;
   const firstRow = Math.max(0, Math.min(recommendedIndex - 1, sorted.length - MAX_ROWS));
@@ -69,9 +77,10 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
   let status: string | null = null;
   if (!trip.configured) status = 'Choose stations in Settings';
   else if (plan?.status === 'done') status = 'Arrival time passed';
+  else if (ahead && plan?.leaveHomeAt) status = `Leave at ${time(plan.leaveHomeAt)}`;
   else if (plan?.recommended) status = leaveLabel(plan, now);
   else if (trip.loading) status = 'Checking…';
-  else if (!trip.inWindow && now < windowStart) status = `From ${time(windowStart)}`;
+  else if (!ahead && !trip.inWindow && now < windowStart) status = `From ${time(windowStart)}`;
 
   const from = schedule.origin ? stationOf(schedule.origin.name) : '—';
   const to = schedule.destination ? stationOf(schedule.destination.name) : '—';
@@ -81,6 +90,7 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
       <View style={styles.header}>
         <Text style={[type.kicker, { color: colors.accent }]} numberOfLines={1}>
           {schedule.name.toUpperCase()}
+          {ahead ? ` · ${dayLabel(deadline, trip.dayOffset).toUpperCase()}` : ''}
         </Text>
         <Text style={[type.caption, { color: colors.muted }]} numberOfLines={1}>
           {from} → {to} · arrive by {time(deadline)}
@@ -93,8 +103,14 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
             ]}
             numberOfLines={1}
           >
-            {trip.stale ? 'Not updated since' : 'Updated'} {time(trip.fetchedAt)}
-            {plan?.recommended ? (plan.recommended.realtime ? ' · live' : ' · timetable') : ''}
+            {ahead
+              ? `Timetable · checked ${time(trip.fetchedAt)}`
+              : `${trip.stale ? 'Not updated since' : 'Updated'} ${time(trip.fetchedAt)}`}
+            {plan?.recommended && !ahead
+              ? plan.recommended.realtime
+                ? ' · live'
+                : ' · timetable'
+              : ''}
             {trip.error ? ' · last update failed' : ''}
           </Text>
         ) : null}
@@ -128,7 +144,7 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
               onPress={() => setOpen(expanded ? null : journey)}
               accessibilityRole="button"
               accessibilityState={{ expanded }}
-              accessibilityLabel={`${leg?.line ?? 'Walk'} at ${time(depart)}, in ${countdown} minutes${isRecommended ? ', recommended' : ''}`}
+              accessibilityLabel={`${leg?.line ?? 'Walk'} at ${time(depart)}${ahead ? '' : `, in ${countdown} minutes`}${isRecommended ? ', recommended' : ''}`}
               style={({ pressed }) => [
                 styles.row,
                 { borderTopColor: colors.divider, opacity: pressed ? 0.6 : 1 },
@@ -152,17 +168,19 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
                   {tooLate ? ' · late' : ''}
                 </Text>
               </View>
-              <View style={styles.countdown}>
-                <Text
-                  style={[
-                    styles.countdownValue,
-                    { color: isRecommended ? colors.accent : colors.text },
-                  ]}
-                >
-                  {countdown}
-                </Text>
-                <Text style={[type.caption, { color: colors.faint }]}>min</Text>
-              </View>
+              {ahead ? null : (
+                <View style={styles.countdown}>
+                  <Text
+                    style={[
+                      styles.countdownValue,
+                      { color: isRecommended ? colors.accent : colors.text },
+                    ]}
+                  >
+                    {countdown}
+                  </Text>
+                  <Text style={[type.caption, { color: colors.faint }]}>min</Text>
+                </View>
+              )}
             </Pressable>
             {expanded ? <Legs journey={journey} time={time} /> : null}
           </View>
@@ -179,13 +197,17 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
         >
           {trip.error
             ? trip.error.message
-            : trip.inWindow
-              ? trip.loading
-                ? 'Checking departures…'
-                : 'No departures found that you can still catch.'
-              : now > deadline
-                ? 'Arrival time has passed for today.'
-                : `Departures appear from ${time(windowStart)}.`}
+            : ahead
+              ? trip.loading || !trip.fetchedAt
+                ? 'Checking the timetable…'
+                : 'No timetable found for this trip yet.'
+              : trip.inWindow
+                ? trip.loading
+                  ? 'Checking departures…'
+                  : 'No departures found that you can still catch.'
+                : now > deadline
+                  ? 'Arrival time has passed for today.'
+                  : `Departures appear from ${time(windowStart)}.`}
         </Text>
       ) : null}
     </View>

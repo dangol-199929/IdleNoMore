@@ -6,7 +6,7 @@ import { fonts, spacing, type, useTheme } from '../../theme';
 import { formatClock } from '../../utils/time';
 import { departureOf } from '../engine';
 import type { CommuteState, TripState } from '../useCommute';
-import { leaveLabel, mainLeg } from './format';
+import { dayLabel, leaveLabel, mainLeg } from './format';
 import { LineBadge } from './TripCard';
 
 interface CommuteWidgetProps {
@@ -48,8 +48,12 @@ function TripLine({ trip, now, onOpen }: { trip: TripState; now: Date; onOpen: (
   const late = plan?.status === 'running-late';
   const urgent = plan?.status === 'leave-now' || plan?.status === 'leave-soon';
 
+  const ahead = trip.dayOffset > 0;
+  const time = (d: Date) => formatClock(d, settings.clockFormat);
   const status = journey
-    ? leaveLabel(plan!, now)
+    ? ahead && plan!.leaveHomeAt
+      ? `${dayLabel(trip.deadline, trip.dayOffset)} · leave ${time(plan!.leaveHomeAt)}`
+      : leaveLabel(plan!, now)
     : trip.error
       ? 'Unavailable'
       : trip.loading
@@ -70,7 +74,7 @@ function TripLine({ trip, now, onOpen }: { trip: TripState; now: Date; onOpen: (
         <Text
           style={[
             styles.status,
-            { color: late ? colors.warning : urgent ? colors.accent : colors.text },
+            { color: late ? colors.warning : urgent && !ahead ? colors.accent : colors.text },
           ]}
           numberOfLines={1}
         >
@@ -81,7 +85,7 @@ function TripLine({ trip, now, onOpen }: { trip: TripState; now: Date; onOpen: (
           numberOfLines={1}
         >
           {trip.schedule.name}
-          {journey ? ` · ${formatClock(departureOf(journey), settings.clockFormat)}` : ''}
+          {journey ? ` · ${time(departureOf(journey))}` : ''}
           {late ? ` · ~${plan!.lateByMinutes} min late` : ''}
           {trip.stale ? ' · not updated' : ''}
         </Text>

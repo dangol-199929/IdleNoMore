@@ -14,7 +14,7 @@ export async function getApiKey(): Promise<string | null> {
   }
   // Development only: a key supplied through the dev server's environment, so the
   // feature can be tested on an emulator. Release builds never set this variable.
-  return __DEV__ ? (process.env.EXPO_PUBLIC_TFNSW_DEV_KEY ?? null) : null;
+  return __DEV__ ? process.env.EXPO_PUBLIC_TFNSW_DEV_KEY?.trim() || null : null;
 }
 
 export async function setApiKey(value: string | null): Promise<void> {

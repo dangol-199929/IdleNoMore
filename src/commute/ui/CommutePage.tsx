@@ -24,12 +24,12 @@ export function CommutePage({ now, commute, isLandscape, onOpenSettings }: Commu
       ? 'Set up your commute'
       : commute.hasKey === false
         ? 'Add your Transport for NSW key'
-        : 'No commute today';
+        : 'No commute this week';
     const body = !commute.hasSchedules
       ? 'Add a trip for each person: where from, where to, and when you need to arrive.'
       : commute.hasKey === false
         ? 'Paste your free Open Data key in Settings › Commute to see live departures.'
-        : 'None of your commute schedules are set for today.';
+        : 'None of your trips are switched on for the next 7 days.';
     return (
       <View style={styles.empty}>
         <Text style={[type.title, { color: colors.text }]}>{title}</Text>

@@ -95,6 +95,10 @@ your arrival time. Times are Transport for NSW estimates, not guarantees; "live"
 supplied real-time data, "timetable" means it didn't. Departure notifications are not in this
 version.
 
+Once today's arrival time has passed, the Commute page (and the Clock page card) switches to the
+next day's trips, usually tomorrow's, with timetable times and when to leave. Live times take over
+again inside the 3-hour window.
+
 For development, `EXPO_PUBLIC_TFNSW_DEV_KEY` in the dev server's environment supplies a key to
 debug builds only.
 
