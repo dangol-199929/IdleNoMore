@@ -18,8 +18,8 @@ Swipe left and right between pages (reorder or hide them in Settings › Screens
 | **Dashboard** | Grid, Feature or Columns arrangement of widgets: clock, date, agenda, reminders, photo, battery, countdown. |
 
 Desk mode keeps the screen on, hides the system bars, and applies a day/night schedule with
-separate brightness levels and a near-black night theme (amber or red). Tap the screen for
-quick controls; the gear icon opens Settings. Everything you change is saved on the phone.
+separate brightness levels and a near-black night theme (amber or red). The gear icon opens
+Settings, where you can also force day or night. Everything you change is saved on the phone.
 
 ## Requirements
 
