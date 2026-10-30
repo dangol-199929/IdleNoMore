@@ -3,6 +3,8 @@ import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
 import { Clock } from '../../components/Clock';
 import { DateLine } from '../../components/DateLine';
+import { CommuteWidget } from '../../commute/ui/CommuteWidget';
+import type { CommuteState } from '../../commute/useCommute';
 import { AgendaWidget } from '../../components/widgets/AgendaWidget';
 import { BatteryWidget } from '../../components/widgets/BatteryWidget';
 import { CountdownWidget } from '../../components/widgets/CountdownWidget';
@@ -46,6 +48,8 @@ interface DashboardPageProps {
   onOpenCalendar: () => void;
   onOpenReminders: () => void;
   onAddEvent: () => void;
+  commute: CommuteState;
+  onOpenCommute: () => void;
 }
 
 /** A user-arranged grid of widgets, chosen in Settings › Dashboard. */
@@ -145,6 +149,8 @@ function DashboardWidget({
   onOpenCalendar,
   onOpenReminders,
   onAddEvent,
+  commute,
+  onOpenCommute,
 }: DashboardPageProps & { id: WidgetId; size: { width: number; height: number } }) {
   const { colors } = useTheme();
   const { settings } = useSettings();
@@ -214,6 +220,12 @@ function DashboardWidget({
       return (
         <View style={styles.middle}>
           <BatteryWidget size={Math.min(bigText, 96)} />
+        </View>
+      );
+    case 'commute':
+      return (
+        <View style={styles.middle}>
+          <CommuteWidget commute={commute} now={now} onOpen={onOpenCommute} />
         </View>
       );
     case 'countdown':

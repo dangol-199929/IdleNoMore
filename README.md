@@ -14,6 +14,7 @@ Swipe left and right between pages (reorder or hide them in Settings › Screens
 | **Calendar** | Today's agenda from calendars synced to the phone: now / next / finished, all-day events, refresh, event details, and **Add event** (title, day, time, duration or all-day, calendar, location). |
 | **Reminders** | Local reminders with date and time, overdue markers, one-tap complete, edit, delete, notifications. |
 | **Photos** | Slideshow of photos you pick with Android's photo picker: interval, pause, fit/fill, clock overlay, crossfade. |
+| **Commute** | Smart Commute (Sydney): today's schedule, when to leave home, the recommended train/bus with platform and live times, journey legs, notices and disruptions, other options. Uses Transport for NSW Trip Planner data. |
 | **Dashboard** | Grid, Feature or Columns arrangement of widgets: clock, date, agenda, reminders, photo, battery, countdown. |
 
 Desk mode keeps the screen on, hides the system bars, and applies a day/night schedule with
@@ -79,6 +80,23 @@ src/services/                brightness, calendar, notifications, photos (platfo
 src/storage/                 SQLite database with migrations; settings, reminders, photos
 src/theme/                   palettes, accents, fonts, type scale, spacing
 ```
+
+## Smart Commute setup
+
+1. Create a free application with **Trip Planner APIs** on the
+   [Transport for NSW Open Data Hub](https://opendata.transport.nsw.gov.au) and copy its API key.
+2. In the app: Settings › Commute › paste the key › Save (it's stored encrypted on the phone, never
+   in the code or the APK).
+3. Add a schedule: days, from and to (station, stop or address), arrive-by time, walking minutes
+   at each end and a safety buffer.
+
+Journeys refresh every 2 minutes only while a commute view is on screen during the 3 hours before
+your arrival time. Times are Transport for NSW estimates, not guarantees; "live" means the planner
+supplied real-time data, "timetable" means it didn't. Departure notifications are not in this
+version.
+
+For development, `EXPO_PUBLIC_TFNSW_DEV_KEY` in the dev server's environment supplies a key to
+debug builds only.
 
 ## Permissions
 

@@ -1,3 +1,5 @@
+import type { CommuteSchedule } from '../commute/types';
+
 /** Which look the app uses during the day. */
 export type DayTheme = 'dark' | 'black' | 'warm' | 'slate' | 'light';
 
@@ -10,8 +12,15 @@ export type ModeOverride = 'auto' | 'day' | 'night';
 export type DisplayMode = 'day' | 'night';
 
 /** The swipeable desk pages. */
-export type PageId = 'clock' | 'calendar' | 'reminders' | 'photos' | 'dashboard';
-export const ALL_PAGES: PageId[] = ['clock', 'calendar', 'reminders', 'photos', 'dashboard'];
+export type PageId = 'clock' | 'commute' | 'calendar' | 'reminders' | 'photos' | 'dashboard';
+export const ALL_PAGES: PageId[] = [
+  'clock',
+  'commute',
+  'calendar',
+  'reminders',
+  'photos',
+  'dashboard',
+];
 
 export type PhotoFit = 'contain' | 'cover';
 
@@ -34,7 +43,15 @@ export type AccentChoice = 'theme' | 'amber' | 'coral' | 'green' | 'blue' | 'vio
 export type MotionPreference = 'system' | 'reduced' | 'full';
 
 export type WidgetId =
-  'clock' | 'date' | 'agenda' | 'reminders' | 'photo' | 'battery' | 'countdown' | 'empty';
+  | 'clock'
+  | 'date'
+  | 'agenda'
+  | 'reminders'
+  | 'photo'
+  | 'battery'
+  | 'countdown'
+  | 'commute'
+  | 'empty';
 
 export interface Settings {
   /** Minutes after midnight when day mode starts (default 07:00). */
@@ -93,6 +110,10 @@ export interface Settings {
   sleepEnd: number;
   /** Minutes without a touch before switching to the photo slideshow; 0 = never. */
   autoSlideshow: number;
+
+  commuteSchedules: CommuteSchedule[];
+  /** Show today's commute on the Clock page during the commute window. */
+  commuteOnClock: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -138,4 +159,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sleepStart: 0,
   sleepEnd: 6 * 60,
   autoSlideshow: 0,
+
+  commuteSchedules: [],
+  commuteOnClock: true,
 };

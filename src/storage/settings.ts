@@ -21,8 +21,34 @@ const WIDGETS = [
   'photo',
   'battery',
   'countdown',
+  'commute',
   'empty',
 ] as const;
+
+const isPlace = (v: unknown) =>
+  v === null ||
+  (typeof v === 'object' &&
+    typeof (v as Record<string, unknown>).id === 'string' &&
+    typeof (v as Record<string, unknown>).name === 'string');
+
+const isSchedule = (v: unknown): boolean => {
+  if (!v || typeof v !== 'object') return false;
+  const s = v as Record<string, unknown>;
+  const minutes = (n: unknown, max: number) => typeof n === 'number' && n >= 0 && n <= max;
+  return (
+    typeof s.id === 'string' &&
+    typeof s.name === 'string' &&
+    typeof s.enabled === 'boolean' &&
+    Array.isArray(s.days) &&
+    s.days.every((d) => typeof d === 'number' && d >= 0 && d <= 6) &&
+    isPlace(s.origin) &&
+    isPlace(s.destination) &&
+    isMinuteOfDay(s.arriveBy) &&
+    minutes(s.walkToStart, 120) &&
+    minutes(s.walkFromEnd, 120) &&
+    minutes(s.buffer, 120)
+  );
+};
 
 // One validator per key, so a malformed or outdated stored value falls back
 // to its default instead of breaking the app.
@@ -75,6 +101,10 @@ const validators: { [K in keyof Settings]: Validator<K> } = {
   sleepStart: isMinuteOfDay,
   sleepEnd: isMinuteOfDay,
   autoSlideshow: (v): v is number => typeof v === 'number' && v >= 0 && v <= 240,
+
+  commuteSchedules: (v): v is Settings['commuteSchedules'] =>
+    Array.isArray(v) && v.length <= 20 && v.every(isSchedule),
+  commuteOnClock: isBool,
 };
 
 export function loadSettings(): Settings {

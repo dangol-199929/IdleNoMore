@@ -40,7 +40,8 @@
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       "expo-image",
-      "expo-localization"
+      "expo-localization",
+      "expo-secure-store"
     ]
   }
 }

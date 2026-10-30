@@ -16,6 +16,7 @@ const WIDGET_OPTIONS: { id: WidgetId; label: string }[] = [
   { id: 'photo', label: 'Photo' },
   { id: 'battery', label: 'Battery' },
   { id: 'countdown', label: 'Countdown' },
+  { id: 'commute', label: 'Commute' },
   { id: 'empty', label: 'Empty' },
 ];
 

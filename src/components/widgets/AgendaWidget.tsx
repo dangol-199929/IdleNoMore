@@ -4,7 +4,8 @@ import type { CalendarApi } from '../../hooks/useCalendar';
 import { eventTiming } from '../../services/calendar';
 import { spacing, type, useTheme } from '../../theme';
 import type { AgendaEvent } from '../../types/calendar';
-import { formatTime24, formatUntil } from '../../utils/time';
+import { useSettings } from '../../hooks/useSettings';
+import { formatClock, formatUntil } from '../../utils/time';
 import { EmptyText, IconButton, WidgetHeader } from '../ui';
 
 interface AgendaWidgetProps {
@@ -28,6 +29,9 @@ export function AgendaWidget({
   onAddEvent,
 }: AgendaWidgetProps) {
   const { colors } = useTheme();
+  const { settings } = useSettings();
+  // Follow the 12/24-hour choice in Settings › Clock.
+  const formatTime24 = (d: Date) => formatClock(d, settings.clockFormat);
   const remaining = calendar.events.filter((e) => eventTiming(e, now) !== 'past');
   // Timed events first; all-day events are context, not something to act on.
   const shown = [...remaining.filter((e) => !e.allDay), ...remaining.filter((e) => e.allDay)].slice(

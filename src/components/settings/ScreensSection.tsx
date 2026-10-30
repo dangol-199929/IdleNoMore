@@ -8,6 +8,7 @@ import { IconButton, PillButton } from '../ui';
 
 export const PAGE_LABELS: Record<PageId, string> = {
   clock: 'Clock',
+  commute: 'Commute',
   calendar: 'Calendar',
   reminders: 'Reminders',
   photos: 'Photos',

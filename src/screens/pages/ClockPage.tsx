@@ -6,6 +6,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Clock } from '../../components/Clock';
 import { DateLine } from '../../components/DateLine';
+import { CommuteWidget } from '../../commute/ui/CommuteWidget';
+import type { CommuteState } from '../../commute/useCommute';
 import { AgendaWidget } from '../../components/widgets/AgendaWidget';
 import { RemindersWidget } from '../../components/widgets/RemindersWidget';
 import type { CalendarApi } from '../../hooks/useCalendar';
@@ -44,6 +46,8 @@ interface ClockPageProps {
   onOpenCalendar: () => void;
   onOpenReminders: () => void;
   onAddEvent: () => void;
+  commute: CommuteState;
+  onOpenCommute: () => void;
 }
 
 /**
@@ -106,8 +110,12 @@ export function ClockPage(props: ClockPageProps) {
   // Fit as many agenda and reminder rows as the height allows (at least one each).
   const sideHeight = isLandscape ? height : height * 0.55;
   const totalRows = Math.floor((sideHeight - HEADER_HEIGHT * 2 - SECTION_GAP) / ROW_HEIGHT);
-  const reminderLimit = totalRows >= 4 ? 2 : 1;
-  const agendaLimit = clamp(totalRows - reminderLimit, 1, 3);
+  // During the commute window the commute card takes the top of the column.
+  const showCommute =
+    settings.commuteOnClock && props.commute.schedule !== null && props.commute.inWindow;
+  const rows = showCommute ? totalRows - 3 : totalRows;
+  const reminderLimit = rows >= 4 ? 2 : 1;
+  const agendaLimit = clamp(rows - reminderLimit, 1, 3);
 
   return (
     <View style={[styles.page, isLandscape && styles.row]}>
@@ -118,6 +126,9 @@ export function ClockPage(props: ClockPageProps) {
           isLandscape ? [styles.side, { borderLeftColor: colors.divider }] : styles.sidePortrait,
         ]}
       >
+        {showCommute ? (
+          <CommuteWidget commute={props.commute} now={now} onOpen={props.onOpenCommute} />
+        ) : null}
         <AgendaWidget
           calendar={calendar}
           now={now}

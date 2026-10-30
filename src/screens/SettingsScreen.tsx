@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CommuteSection } from '../commute/ui/CommuteSection';
 import { CalendarsSection } from '../components/settings/CalendarsSection';
 import { ClockSection } from '../components/settings/ClockSection';
 import { DashboardSection } from '../components/settings/DashboardSection';
@@ -25,11 +26,12 @@ import { useSettings } from '../hooks/useSettings';
 import { fonts, spacing, type, useTheme } from '../theme';
 
 export type SettingsTab =
-  'display' | 'clock' | 'screens' | 'photos' | 'dashboard' | 'power' | 'calendars';
+  'display' | 'clock' | 'commute' | 'screens' | 'photos' | 'dashboard' | 'power' | 'calendars';
 
 const TABS: { id: SettingsTab; label: string; icon: IconName }[] = [
   { id: 'display', label: 'Display', icon: 'sun' },
   { id: 'clock', label: 'Clock', icon: 'clock' },
+  { id: 'commute', label: 'Commute', icon: 'navigation' },
   { id: 'screens', label: 'Screens', icon: 'layers' },
   { id: 'photos', label: 'Photos', icon: 'image' },
   { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
@@ -116,6 +118,7 @@ export function SettingsScreen({ onClose, onPreviewNight, tab, onTabChange }: Se
       {tab === 'dashboard' ? <DashboardSection /> : null}
       {tab === 'power' ? <PowerSection /> : null}
       {tab === 'calendars' ? <CalendarsSection /> : null}
+      {tab === 'commute' ? <CommuteSection /> : null}
     </ScrollView>
   );
 

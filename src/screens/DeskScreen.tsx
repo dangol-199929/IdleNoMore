@@ -11,6 +11,8 @@ import { EventEditor } from '../components/EventEditor';
 import { ReminderEditor } from '../components/ReminderEditor';
 import { NavStrip } from '../components/NavStrip';
 import { IconButton, PageDots } from '../components/ui';
+import { CommutePage } from '../commute/ui/CommutePage';
+import { useCommute } from '../commute/useCommute';
 import { useCalendar } from '../hooks/useCalendar';
 import { usePhotos } from '../hooks/usePhotos';
 import { useClock } from '../hooks/useClock';
@@ -22,6 +24,7 @@ import { ThemeContext, fonts, getTheme, spacing } from '../theme';
 import type { AgendaEvent } from '../types/calendar';
 import type { Reminder } from '../types/reminder';
 import type { ModeOverride, PageId } from '../types/settings';
+import type { SettingsTab } from './SettingsScreen';
 import { burnInOffset } from '../utils/burnIn';
 import { CalendarPage } from './pages/CalendarPage';
 import { ClockPage } from './pages/ClockPage';
@@ -37,7 +40,7 @@ const NEXT_OVERRIDE: Record<ModeOverride, ModeOverride> = {
 };
 
 interface DeskScreenProps {
-  onOpenSettings: () => void;
+  onOpenSettings: (tab?: SettingsTab) => void;
   /** When true, show night mode regardless of the schedule (settings preview). */
   nightPreview: boolean;
   onEndPreview: () => void;
@@ -91,6 +94,15 @@ export function DeskScreen({
     return Math.max(0, pages.indexOf(wanted));
   });
   const currentPage = pages[Math.min(page, pages.length - 1)];
+  // Only fetch transport data while something commute-related is on screen.
+  const commuteVisible =
+    !nightPreview &&
+    (currentPage === 'commute' ||
+      (currentPage === 'clock' &&
+        settings.commuteOnClock &&
+        settings.homeLayout === 'productivity') ||
+      (currentPage === 'dashboard' && settings.dashboardWidgets.includes('commute')));
+  const commute = useCommute(now, commuteVisible);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [editing, setEditing] = useState<Reminder | 'new' | null>(null);
   const [addingEvent, setAddingEvent] = useState(false);
@@ -190,7 +202,7 @@ export function DeskScreen({
                   visible={currentPage === 'photos' && !nightPreview}
                   photos={photos}
                   insets={insets}
-                  onOpenSettings={onOpenSettings}
+                  onOpenSettings={() => onOpenSettings()}
                 />
               </View>
             ) : (
@@ -218,6 +230,15 @@ export function DeskScreen({
                       onOpenCalendar={() => goTo('calendar')}
                       onOpenReminders={() => goTo('reminders')}
                       onAddEvent={() => setAddingEvent(true)}
+                      commute={commute}
+                      onOpenCommute={() => goTo('commute')}
+                    />
+                  ) : key === 'commute' ? (
+                    <CommutePage
+                      now={now}
+                      commute={commute}
+                      isLandscape={isLandscape}
+                      onOpenSettings={() => onOpenSettings('commute')}
                     />
                   ) : key === 'calendar' ? (
                     <CalendarPage
@@ -250,6 +271,8 @@ export function DeskScreen({
                       onOpenCalendar={() => goTo('calendar')}
                       onOpenReminders={() => goTo('reminders')}
                       onAddEvent={() => setAddingEvent(true)}
+                      commute={commute}
+                      onOpenCommute={() => goTo('commute')}
                     />
                   )}
                 </View>
@@ -261,7 +284,11 @@ export function DeskScreen({
         {!nightPreview && !(currentPage === 'photos' && photos.photos.length > 0) ? (
           <>
             <View style={[styles.settingsButton, { top: insets.top + 4, right: insets.right + 4 }]}>
-              <IconButton icon="settings" onPress={onOpenSettings} accessibilityLabel="Settings" />
+              <IconButton
+                icon="settings"
+                onPress={() => onOpenSettings()}
+                accessibilityLabel="Settings"
+              />
             </View>
             {settings.showNavStrip ? (
               <View style={[styles.dots, { bottom: insets.bottom }]}>
@@ -293,7 +320,7 @@ export function DeskScreen({
           visible={controlsVisible && !nightPreview}
           override={settings.override}
           onCycleOverride={cycleOverride}
-          onOpenSettings={onOpenSettings}
+          onOpenSettings={() => onOpenSettings()}
           message={brightnessError}
           bottomInset={insets.bottom}
         />
