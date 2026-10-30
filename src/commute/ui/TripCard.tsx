@@ -1,6 +1,14 @@
 import { Feather } from '@expo/vector-icons';
-import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ScrollViewInstance,
+} from 'react-native';
 
 import { useSettings } from '../../hooks/useSettings';
 import { fonts, spacing, type, useTheme } from '../../theme';
@@ -10,8 +18,6 @@ import type { Journey, Leg } from '../types';
 import type { TripState } from '../useCommute';
 import { dayLabel, delayMinutes, lineColour, mainLeg, platformOf, stationOf } from './format';
 import { assess, useCommutePalette, type Assessment, type Tone } from './palette';
-
-const MAX_OPTIONS = 2;
 
 /** "Parramatta Station, Platform 1" → "Parramatta": short enough for narrow cards. */
 const short = (name: string) => stationOf(name).replace(/ (Station|Light Rail|Wharf)$/, '');
@@ -102,11 +108,6 @@ export function TripCard({
   const tone: Tone = a ? a.tone : trip.error ? 'late' : 'neutral';
   const toneColour = palette.tones[tone];
 
-  // The options either side of the one shown, as chips.
-  const shownIndex = shown ? options.indexOf(shown) : 0;
-  const first = Math.max(0, Math.min(shownIndex - 1, options.length - MAX_OPTIONS - 1));
-  const chips = options.slice(first, first + MAX_OPTIONS + 1).filter((j) => j !== shown);
-
   const from = schedule.origin ? short(schedule.origin.name) : 'From?';
   const to = schedule.destination ? short(schedule.destination.name) : 'To?';
   const dayColour = ahead ? palette.tones.planned : palette.tones.good;
@@ -172,19 +173,16 @@ export function TripCard({
 
           <Timeline journey={shown} time={time} />
 
-          {chips.length > 0 ? (
-            <View style={styles.pills}>
-              {chips.map((j) => (
-                <OptionChip
-                  key={journeyKey(j)}
-                  journey={j}
-                  a={assess(j, schedule, deadline, now, ahead)}
-                  ahead={ahead}
-                  time={time}
-                  onPress={() => setPicked(journeyKey(j))}
-                />
-              ))}
-            </View>
+          {options.length > 1 ? (
+            <OptionCarousel
+              options={options}
+              shown={shown}
+              recommended={plan?.recommended ?? null}
+              assessOf={(j) => assess(j, schedule, deadline, now, ahead)}
+              ahead={ahead}
+              time={time}
+              onPick={(j) => setPicked(journeyKey(j))}
+            />
           ) : null}
 
           {showLegs ? <Notices journey={shown} /> : null}
@@ -452,33 +450,96 @@ function Timeline({ journey, time }: { journey: Journey; time: (d: Date) => stri
   );
 }
 
+/**
+ * Every option in departure order as a swipeable row. The one on show is
+ * filled in; a star marks the recommended one. Opens scrolled to the selection.
+ */
+function OptionCarousel({
+  options,
+  shown,
+  recommended,
+  assessOf,
+  ahead,
+  time,
+  onPick,
+}: {
+  options: Journey[];
+  shown: Journey;
+  recommended: Journey | null;
+  assessOf: (j: Journey) => Assessment;
+  ahead: boolean;
+  time: (d: Date) => string;
+  onPick: (j: Journey) => void;
+}) {
+  const scroller = useRef<ScrollViewInstance>(null);
+  return (
+    <ScrollView
+      ref={scroller}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.carousel}
+    >
+      {options.map((j) => (
+        <OptionChip
+          key={journeyKey(j)}
+          journey={j}
+          a={assessOf(j)}
+          ahead={ahead}
+          time={time}
+          selected={j === shown}
+          recommended={j === recommended}
+          onPress={() => onPick(j)}
+          onSelectedLayout={(x) => scroller.current?.scrollTo({ x: Math.max(0, x - 48) })}
+        />
+      ))}
+    </ScrollView>
+  );
+}
+
 function OptionChip({
   journey,
   a,
   ahead,
   time,
+  selected,
+  recommended,
   onPress,
+  onSelectedLayout,
 }: {
   journey: Journey;
   a: Assessment;
   ahead: boolean;
   time: (d: Date) => string;
+  selected: boolean;
+  recommended: boolean;
   onPress: () => void;
+  onSelectedLayout: (x: number) => void;
 }) {
   const { colors } = useTheme();
-  const { tones } = useCommutePalette();
+  const { tones, tint } = useCommutePalette();
   const leg = mainLeg(journey);
   const delay = leg ? delayMinutes(leg) : null;
   const colour = tones[a.tone];
   return (
     <Pressable
       onPress={onPress}
+      onLayout={(e) => selected && onSelectedLayout(e.nativeEvent.layout.x)}
       accessibilityRole="button"
-      accessibilityLabel={`Show the ${leg?.line ?? 'service'} at ${time(departureOf(journey))}`}
-      style={({ pressed }) => [styles.chip, { borderColor: colour, opacity: pressed ? 0.6 : 1 }]}
+      accessibilityState={{ selected }}
+      accessibilityLabel={`Show the ${leg?.line ?? 'service'} at ${time(departureOf(journey))}${recommended ? ', recommended' : ''}`}
+      style={({ pressed }) => [
+        styles.chip,
+        selected
+          ? { borderColor: colour, borderWidth: 2, backgroundColor: tint(colour, 0.22) }
+          : { borderColor: tint(colour, 0.55) },
+        { opacity: pressed ? 0.6 : selected ? 1 : 0.85 },
+      ]}
     >
+      {recommended ? <Feather name="star" size={12} color={colour} /> : null}
       <LineBadge leg={leg} size="small" />
-      <Text style={[styles.chipTime, { color: colors.text }]}>
+      <Text
+        style={[styles.chipTime, { color: colors.text }, selected && { fontFamily: fonts.medium }]}
+      >
         {time(departureOf(journey)).split(' ')[0]}
       </Text>
       {delay !== null && delay > 0 ? (
@@ -754,6 +815,10 @@ const styles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
+  },
+  carousel: {
+    gap: spacing.sm,
+    paddingRight: spacing.sm,
   },
   chip: {
     flexDirection: 'row',
