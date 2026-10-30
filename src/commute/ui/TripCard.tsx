@@ -285,22 +285,32 @@ function StatusPill({
   time: (d: Date) => string;
 }) {
   if (a.spare < 0) {
-    return <Pill icon="alert-circle" text={`About ${-a.spare} min late`} colour={colour} />;
+    return (
+      <Pill
+        icon="alert-circle"
+        text={`${-a.spare} min late · ${time(a.arriveAt)}`}
+        colour={colour}
+      />
+    );
   }
   if (ahead) {
     return (
       <Pill
         icon="calendar"
-        text={`Arrive ${time(a.arriveAt)} · ${a.spare} min spare`}
+        text={`Arrive ${time(a.arriveAt)} · ${a.spare} min early`}
         colour={colour}
       />
     );
   }
-  if (a.tone === 'now') return <Pill icon="zap" text="Go now" colour={colour} />;
-  if (a.tone === 'soon') {
-    return <Pill icon="clock" text={`Get ready · ${a.spare} min spare`} colour={colour} />;
+  // Today's pills give the arrival as a clock time, so the only "minutes" on the
+  // card is the countdown to leaving; the colour and icon say on time or not.
+  if (a.tone === 'now') {
+    return <Pill icon="zap" text={`Go now · ${time(a.arriveAt)}`} colour={colour} />;
   }
-  return <Pill icon="check-circle" text={`On time · ${a.spare} min spare`} colour={colour} />;
+  if (a.tone === 'soon') {
+    return <Pill icon="clock" text={`Arrive ${time(a.arriveAt)}`} colour={colour} />;
+  }
+  return <Pill icon="check-circle" text={`Arrive ${time(a.arriveAt)}`} colour={colour} />;
 }
 
 /** "● Live 7:21" / "Timetable 7:21", in the late colour when out of date. */

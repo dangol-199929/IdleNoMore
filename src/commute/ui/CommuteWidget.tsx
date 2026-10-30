@@ -68,7 +68,7 @@ function TripLine({ trip, now, onOpen }: { trip: TripState; now: Date; onOpen: (
       : trip.loading
         ? 'Checking…'
         : '—';
-  const detail = a ? (a.spare < 0 ? `${-a.spare}m late` : `${a.spare}m spare`) : '';
+  const detail = a ? (a.spare < 0 ? `${-a.spare}m late` : `arrive ${time(a.arriveAt)}`) : '';
 
   return (
     <Pressable
