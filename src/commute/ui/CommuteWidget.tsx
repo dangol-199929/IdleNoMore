@@ -6,7 +6,8 @@ import { fonts, spacing, type, useTheme } from '../../theme';
 import { formatClock } from '../../utils/time';
 import { departureOf } from '../engine';
 import type { CommuteState, TripState } from '../useCommute';
-import { dayLabel, leaveLabel, mainLeg } from './format';
+import { dayLabel, mainLeg } from './format';
+import { assess, useCommutePalette } from './palette';
 import { LineBadge } from './TripCard';
 
 interface CommuteWidgetProps {
@@ -42,25 +43,32 @@ export function CommuteWidget({ commute, now, onOpen }: CommuteWidgetProps) {
 function TripLine({ trip, now, onOpen }: { trip: TripState; now: Date; onOpen: () => void }) {
   const { colors } = useTheme();
   const { settings } = useSettings();
-  const plan = trip.plan;
-  const journey = plan?.recommended ?? null;
-  const leg = journey ? mainLeg(journey) : null;
-  const late = plan?.status === 'running-late';
-  const urgent = plan?.status === 'leave-now' || plan?.status === 'leave-soon';
-
-  const ahead = trip.dayOffset > 0;
+  const palette = useCommutePalette();
   const time = (d: Date) => formatClock(d, settings.clockFormat);
-  const status = journey
-    ? ahead && plan!.leaveHomeAt
-      ? `${dayLabel(trip.deadline, trip.dayOffset)} · leave ${time(plan!.leaveHomeAt)}`
-      : leaveLabel(plan!, now)
+  const journey = trip.plan?.recommended ?? null;
+  const leg = journey ? mainLeg(journey) : null;
+  const ahead = trip.dayOffset > 0;
+  const a = journey ? assess(journey, trip.schedule, trip.deadline, now, ahead) : null;
+  const colour = palette.tones[a ? a.tone : trip.error ? 'late' : 'neutral'];
+  const personIndex = Math.max(
+    0,
+    settings.commuteSchedules.findIndex((s) => s.id === trip.schedule.id),
+  );
+
+  const status = a
+    ? ahead
+      ? `${dayLabel(trip.deadline, trip.dayOffset)} · leave ${time(a.leaveAt)}`
+      : a.toLeave <= 0
+        ? 'Go now'
+        : a.toLeave < 60
+          ? `Leave in ${a.toLeave} min`
+          : `Leave at ${time(a.leaveAt)}`
     : trip.error
       ? 'Unavailable'
       : trip.loading
         ? 'Checking…'
-        : plan?.status === 'done'
-          ? 'Done for today'
-          : '—';
+        : '—';
+  const detail = a ? (a.spare < 0 ? `${-a.spare}m late` : `${a.spare}m spare`) : '';
 
   return (
     <Pressable
@@ -69,25 +77,17 @@ function TripLine({ trip, now, onOpen }: { trip: TripState; now: Date; onOpen: (
       accessibilityLabel={`${trip.schedule.name}: ${status}`}
       style={({ pressed }) => [styles.line, { opacity: pressed ? 0.6 : 1 }]}
     >
+      <View style={[styles.stripe, { backgroundColor: colour }]} />
       {journey ? <LineBadge leg={leg} /> : <View style={styles.badgeSpace} />}
       <View style={styles.flex}>
-        <Text
-          style={[
-            styles.status,
-            { color: late ? colors.warning : urgent && !ahead ? colors.accent : colors.text },
-          ]}
-          numberOfLines={1}
-        >
+        <Text style={[styles.status, { color: colour }]} numberOfLines={1}>
           {status}
         </Text>
-        <Text
-          style={[type.caption, { color: trip.stale ? colors.warning : colors.faint }]}
-          numberOfLines={1}
-        >
-          {trip.schedule.name}
+        <Text style={[type.caption, { color: colors.muted }]} numberOfLines={1}>
+          <Text style={{ color: palette.person(personIndex) }}>{trip.schedule.name}</Text>
           {journey ? ` · ${time(departureOf(journey))}` : ''}
-          {late ? ` · ~${plan!.lateByMinutes} min late` : ''}
-          {trip.stale ? ' · not updated' : ''}
+          {detail ? <Text style={{ color: colour }}>{` · ${detail}`}</Text> : null}
+          {trip.stale ? <Text style={{ color: palette.tones.late }}> · not updated</Text> : null}
         </Text>
       </View>
     </Pressable>
@@ -103,6 +103,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     minHeight: 56,
+  },
+  stripe: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    marginVertical: 8,
   },
   badgeSpace: {
     width: 44,

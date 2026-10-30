@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   grid: {
-    gap: spacing.xl,
+    gap: spacing.md,
   },
   row: {
     flexDirection: 'row',
