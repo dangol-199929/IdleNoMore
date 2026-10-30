@@ -48,7 +48,10 @@ function Root() {
     return () => clearTimeout(timer);
   }, [nightPreview]);
 
-  const openSettings = useCallback(() => setScreen('settings'), []);
+  const openSettings = useCallback((tab?: SettingsTab) => {
+    if (tab) setSettingsTab(tab);
+    setScreen('settings');
+  }, []);
   const closeSettings = useCallback(() => setScreen('desk'), []);
   const previewNight = useCallback(() => {
     setNightPreview(true);
