@@ -85,6 +85,19 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
         <Text style={[type.caption, { color: colors.muted }]} numberOfLines={1}>
           {from} → {to} · arrive by {time(deadline)}
         </Text>
+        {trip.fetchedAt ? (
+          <Text
+            style={[
+              type.caption,
+              { color: trip.stale || trip.error ? colors.warning : colors.faint },
+            ]}
+            numberOfLines={1}
+          >
+            {trip.stale ? 'Not updated since' : 'Updated'} {time(trip.fetchedAt)}
+            {plan?.recommended ? (plan.recommended.realtime ? ' · live' : ' · timetable') : ''}
+            {trip.error ? ' · last update failed' : ''}
+          </Text>
+        ) : null}
         {status ? (
           <Text
             style={[
@@ -132,7 +145,9 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
                 </Text>
                 <Text style={[type.caption, { color: colors.faint }]} numberOfLines={1}>
                   {platform ? `Plat ${platform} · ` : ''}arr {time(arrivalOf(journey))}
-                  {journey.transfers > 0 ? ` · ${journey.transfers} change` : ''}
+                  {journey.transfers > 0
+                    ? ` · ${journey.transfers} change${journey.transfers > 1 ? 's' : ''}`
+                    : ''}
                   {hasSeriousAlert(journey) ? ' · disruption' : ''}
                   {tooLate ? ' · late' : ''}
                 </Text>
@@ -171,20 +186,6 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
               : now > deadline
                 ? 'Arrival time has passed for today.'
                 : `Departures appear from ${time(windowStart)}.`}
-        </Text>
-      ) : null}
-
-      {trip.fetchedAt ? (
-        <Text
-          style={[
-            type.caption,
-            styles.footer,
-            { color: trip.stale ? colors.warning : colors.faint },
-          ]}
-        >
-          {trip.stale ? 'Not updated since' : 'Updated'} {time(trip.fetchedAt)}
-          {plan?.recommended ? (plan.recommended.realtime ? ' · live' : ' · timetable') : ''}
-          {trip.error && trip.fetchedAt ? ' · last update failed' : ''}
         </Text>
       ) : null}
     </View>

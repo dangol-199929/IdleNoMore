@@ -57,21 +57,47 @@ function inWindowAt(s: CommuteSchedule, now: Date) {
   return now <= deadline && now.getTime() >= deadline.getTime() - WINDOW_MINUTES * 60_000;
 }
 
+/** Identity of a journey by its first service: same train, same departure. */
+function serviceKey(j: Journey): string {
+  const leg = j.legs.find((l) => !l.isWalk) ?? j.legs[0];
+  return `${leg.line ?? leg.modeName}|${leg.from}|${leg.departPlanned.getTime()}`;
+}
+
+/**
+ * The planner often returns the same first train several times with different
+ * onward routings. Keep one per service: fewest changes, then earliest arrival.
+ */
+function dedupe(journeys: Journey[]): Journey[] {
+  const best = new Map<string, Journey>();
+  for (const j of journeys) {
+    const key = serviceKey(j);
+    const current = best.get(key);
+    const arrive = (x: Journey) => (x.arriveEstimated ?? x.arrivePlanned).getTime();
+    if (
+      !current ||
+      j.transfers < current.transfers ||
+      (j.transfers === current.transfers && arrive(j) < arrive(current))
+    ) {
+      best.set(key, j);
+    }
+  }
+  return [...best.values()];
+}
+
 async function fetchFor(schedule: CommuteSchedule, key: string | null): Promise<Journey[]> {
   const nowAt = new Date();
   const deadline = sydneyTimeOn(nowAt, schedule.arriveBy);
   const target = new Date(deadline.getTime() - (schedule.walkFromEnd + schedule.buffer) * 60_000);
+  const leaving = new Date(nowAt.getTime() + schedule.walkToStart * 60_000);
   const origin = schedule.origin!.id;
   const destination = schedule.destination!.id;
-  let found = await planJourneys(origin, destination, target, 'arrive', key);
-  // If nothing that arrives in time can still be caught, also ask for the next
-  // departures from now, so the best late option can be shown honestly.
-  const plan = planCommute(schedule, found, nowAt);
-  if (plan.status === 'no-journeys' || plan.status === 'running-late') {
-    const leaving = new Date(nowAt.getTime() + schedule.walkToStart * 60_000);
-    found = [...found, ...(await planJourneys(origin, destination, leaving, 'depart', key))];
-  }
-  return found;
+  // Two questions, like a departure board plus a planner: "what gets me there
+  // by my deadline?" and "what are the next departures from now?".
+  const [arriving, departing] = await Promise.all([
+    planJourneys(origin, destination, target, 'arrive', key),
+    planJourneys(origin, destination, leaving, 'depart', key),
+  ]);
+  return dedupe([...arriving, ...departing]);
 }
 
 /**
