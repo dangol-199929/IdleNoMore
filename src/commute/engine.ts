@@ -46,31 +46,17 @@ export function sydneyTimeOn(at: Date, minutes: number): Date {
   return new Date(guess);
 }
 
-export interface TodaySchedule {
-  schedule: CommuteSchedule | null;
-  /** Explains a missing or ambiguous schedule. */
-  note: string | null;
-}
-
-/** Today's schedule by Sydney weekday; falls back to an enabled default (no days set). */
-export function scheduleForToday(schedules: CommuteSchedule[], now: Date): TodaySchedule {
+/**
+ * Every enabled schedule for today's Sydney weekday, so several people (or
+ * trips) can be followed at once. If none names today, enabled default
+ * schedules (no days chosen) are used instead.
+ */
+export function schedulesForToday(schedules: CommuteSchedule[], now: Date): CommuteSchedule[] {
   const weekday = sydneyWeekday(now);
   const enabled = schedules.filter((s) => s.enabled);
-  const matching = enabled
-    .filter((s) => s.days.includes(weekday))
-    .sort((a, b) => a.arriveBy - b.arriveBy);
-  if (matching.length > 1) {
-    return {
-      schedule: matching[0],
-      note: `${matching.length} schedules are set for today; showing the earliest (${matching[0].name}).`,
-    };
-  }
-  if (matching.length === 1) return { schedule: matching[0], note: null };
-  const fallback = enabled.find((s) => s.days.length === 0) ?? null;
-  return {
-    schedule: fallback,
-    note: fallback ? null : schedules.length === 0 ? null : 'No commute is scheduled for today.',
-  };
+  const matching = enabled.filter((s) => s.days.includes(weekday));
+  const chosen = matching.length > 0 ? matching : enabled.filter((s) => s.days.length === 0);
+  return [...chosen].sort((a, b) => a.arriveBy - b.arriveBy || a.name.localeCompare(b.name));
 }
 
 export const departureOf = (j: Journey) => j.departEstimated ?? j.departPlanned;

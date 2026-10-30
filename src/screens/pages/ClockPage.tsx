@@ -64,7 +64,15 @@ export function ClockPage(props: ClockPageProps) {
   const scale = SCALE[settings.clockScale];
   const left = settings.clockAlign === 'left';
 
-  const withWidgets = layout === 'productivity';
+  // Only show side widgets that have something in them; an empty "Today" or
+  // "Reminders" section is just clutter on a desk display.
+  const showCommute =
+    settings.commuteOnClock &&
+    props.commute.anyInWindow &&
+    props.commute.trips.some((t) => t.configured);
+  const showAgenda = calendar.status === 'ready' && calendar.events.some((e) => e.end > now);
+  const showReminders = reminders.some((r) => !r.completedAt);
+  const withWidgets = layout === 'productivity' && (showCommute || showAgenda || showReminders);
   const clockAreaWidth = withWidgets && isLandscape ? width * 0.54 : width;
   const baseHeight = withWidgets ? (isLandscape ? 0.55 : 0.2) : isLandscape ? 0.62 : 0.3;
   const clockHeight = height * baseHeight * scale;
@@ -89,7 +97,7 @@ export function ClockPage(props: ClockPageProps) {
 
   const battery = settings.showBattery ? <BatteryBadge /> : null;
 
-  if (layout === 'minimal') {
+  if (layout === 'minimal' || (layout === 'productivity' && !withWidgets)) {
     return (
       <View style={styles.page}>
         {clock}
@@ -110,12 +118,12 @@ export function ClockPage(props: ClockPageProps) {
   // Fit as many agenda and reminder rows as the height allows (at least one each).
   const sideHeight = isLandscape ? height : height * 0.55;
   const totalRows = Math.floor((sideHeight - HEADER_HEIGHT * 2 - SECTION_GAP) / ROW_HEIGHT);
-  // During the commute window the commute card takes the top of the column.
-  const showCommute =
-    settings.commuteOnClock && props.commute.schedule !== null && props.commute.inWindow;
-  const rows = showCommute ? totalRows - 3 : totalRows;
-  const reminderLimit = rows >= 4 ? 2 : 1;
-  const agendaLimit = clamp(rows - reminderLimit, 1, 3);
+  // During the commute window the commute card takes the top of the column
+  // (about one row per trip plus its header).
+  const commuteRows = showCommute ? 1 + props.commute.trips.filter((t) => t.configured).length : 0;
+  const rows = totalRows - commuteRows;
+  const reminderLimit = showReminders ? (showAgenda ? (rows >= 4 ? 2 : 1) : clamp(rows, 1, 4)) : 0;
+  const agendaLimit = showAgenda ? clamp(rows - reminderLimit, 1, 4) : 0;
 
   return (
     <View style={[styles.page, isLandscape && styles.row]}>
@@ -129,23 +137,27 @@ export function ClockPage(props: ClockPageProps) {
         {showCommute ? (
           <CommuteWidget commute={props.commute} now={now} onOpen={props.onOpenCommute} />
         ) : null}
-        <AgendaWidget
-          calendar={calendar}
-          now={now}
-          limit={agendaLimit}
-          onSelect={props.onSelectEvent}
-          onOpenCalendar={props.onOpenCalendar}
-          onAddEvent={props.onAddEvent}
-        />
-        <RemindersWidget
-          reminders={reminders}
-          now={now}
-          limit={reminderLimit}
-          onSelect={props.onSelectReminder}
-          onComplete={props.onCompleteReminder}
-          onAdd={props.onAddReminder}
-          onOpenReminders={props.onOpenReminders}
-        />
+        {showAgenda ? (
+          <AgendaWidget
+            calendar={calendar}
+            now={now}
+            limit={agendaLimit}
+            onSelect={props.onSelectEvent}
+            onOpenCalendar={props.onOpenCalendar}
+            onAddEvent={props.onAddEvent}
+          />
+        ) : null}
+        {showReminders ? (
+          <RemindersWidget
+            reminders={reminders}
+            now={now}
+            limit={reminderLimit}
+            onSelect={props.onSelectReminder}
+            onComplete={props.onCompleteReminder}
+            onAdd={props.onAddReminder}
+            onOpenReminders={props.onOpenReminders}
+          />
+        ) : null}
       </View>
       {battery}
     </View>

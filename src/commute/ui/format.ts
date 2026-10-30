@@ -34,3 +34,46 @@ export function delayMinutes(leg: Leg): number | null {
   if (!leg.departEstimated) return null;
   return Math.round((leg.departEstimated.getTime() - leg.departPlanned.getTime()) / 60000);
 }
+
+// Sydney Trains / Metro line colours as used on TfNSW signage, so badges match
+// what people see on platforms. Other modes fall back to their mode colour.
+const LINE_COLOURS: Record<string, string> = {
+  T1: '#F99D1C',
+  T2: '#0098CD',
+  T3: '#F37021',
+  T4: '#005AA3',
+  T5: '#C4258F',
+  T6: '#7C3E21',
+  T7: '#6F818E',
+  T8: '#00954C',
+  T9: '#D11F2F',
+  M1: '#168388',
+  BMT: '#F99D1C',
+  CCN: '#D11F2F',
+  SCO: '#005AA3',
+  HUN: '#833134',
+};
+const MODE_COLOURS: Record<number, string> = {
+  1: '#F6891F',
+  2: '#168388',
+  4: '#E4022D',
+  5: '#00B5EF',
+  7: '#742282',
+  9: '#5AB031',
+  11: '#00B5EF',
+};
+
+export function lineColour(leg: Leg): string {
+  return (leg.line && LINE_COLOURS[leg.line]) || MODE_COLOURS[leg.modeClass] || '#8B8E94';
+}
+
+/** "Parramatta Station, Platform 1" → "1" (null when the stop name has no platform). */
+export function platformOf(stopName: string): string | null {
+  const match = /(?:Platform|Stand|Wharf)\s+([A-Z0-9]+)/i.exec(stopName);
+  return match ? match[1] : null;
+}
+
+/** "Parramatta Station, Platform 1" → "Parramatta Station". */
+export function stationOf(stopName: string): string {
+  return stopName.split(',')[0].trim();
+}

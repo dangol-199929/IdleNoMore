@@ -27,7 +27,7 @@ const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 export function newSchedule(): CommuteSchedule {
   return {
     id: String(Date.now()),
-    name: 'Work',
+    name: 'Me',
     enabled: true,
     days: [1, 2, 3, 4, 5],
     origin: null,
@@ -119,7 +119,7 @@ function Form({
       style={[styles.flex, { backgroundColor: colors.background }]}
     >
       <View style={styles.header}>
-        <Text style={[type.title, styles.flex, { color: colors.text }]}>Commute schedule</Text>
+        <Text style={[type.title, styles.flex, { color: colors.text }]}>Commute trip</Text>
         <Pressable onPress={onClose} accessibilityRole="button" style={styles.headerButton}>
           <Text style={[type.button, { color: colors.muted }]}>Cancel</Text>
         </Pressable>
@@ -137,7 +137,7 @@ function Form({
         <TextInput
           value={draft.name}
           onChangeText={(name) => set({ name })}
-          placeholder="Name, e.g. Work"
+          placeholder="Who or what, e.g. Liza or Wife"
           placeholderTextColor={colors.faint}
           maxLength={40}
           style={[styles.input, { color: colors.text, borderBottomColor: colors.divider }]}

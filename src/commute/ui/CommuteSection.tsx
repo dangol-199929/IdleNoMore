@@ -50,10 +50,12 @@ export function CommuteSection() {
     <>
       <ApiKeySection />
 
-      <Section title="Schedules">
+      <Section title="Trips">
         {schedules.length === 0 ? (
           <Text style={[type.body, { color: colors.muted }]}>
-            Add your usual trip to work. You can create different schedules for different days.
+            Add a trip for each person, e.g. one for you and one for your partner. They can share
+            the same days and times; each shows as its own card. Use different trips for different
+            days if your times change.
           </Text>
         ) : null}
         {schedules.map((s) => (
@@ -91,7 +93,7 @@ export function CommuteSection() {
           </View>
         ))}
         <PillButton
-          label="Add schedule"
+          label="Add trip"
           icon="plus"
           variant="accent"
           onPress={() => setEditing(newSchedule())}
