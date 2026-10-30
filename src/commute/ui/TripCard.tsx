@@ -13,6 +13,9 @@ import { assess, useCommutePalette, type Assessment, type Tone } from './palette
 
 const MAX_OPTIONS = 2;
 
+/** "Parramatta Station, Platform 1" → "Parramatta": short enough for narrow cards. */
+const short = (name: string) => stationOf(name).replace(/ (Station|Light Rail|Wharf)$/, '');
+
 /** Small coloured pill with the line name, like station signage ("T1"). */
 export function LineBadge({
   leg,
@@ -58,10 +61,19 @@ const journeyKey = (j: Journey) => {
 /**
  * One person's commute, built to be read from across the room: the colour
  * says whether you're fine, the big number says when to go, the badge and
- * platform say where, and the bar shows the whole trip door to door. Tap an
- * option chip to see that one instead; tap the big number for the legs.
+ * platform say where, and the route line shows each train and change. Tap an
+ * option chip to see that one instead, the big number for service notices,
+ * and "Live" to refresh.
  */
-export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
+export function TripCard({
+  trip,
+  now,
+  onRefresh,
+}: {
+  trip: TripState;
+  now: Date;
+  onRefresh: () => void;
+}) {
   const { colors } = useTheme();
   const { settings } = useSettings();
   const palette = useCommutePalette();
@@ -95,8 +107,6 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
   const first = Math.max(0, Math.min(shownIndex - 1, options.length - MAX_OPTIONS - 1));
   const chips = options.slice(first, first + MAX_OPTIONS + 1).filter((j) => j !== shown);
 
-  // "Parramatta Station" → "Parramatta": the arrow already says it's a trip.
-  const short = (name: string) => stationOf(name).replace(/ (Station|Light Rail|Wharf)$/, '');
   const from = schedule.origin ? short(schedule.origin.name) : 'From?';
   const to = schedule.destination ? short(schedule.destination.name) : 'To?';
   const dayColour = ahead ? palette.tones.planned : palette.tones.good;
@@ -119,7 +129,12 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
         </Text>
         {/* For a later day the TOMORROW pill already says it's the timetable. */}
         {shown && (!ahead || trip.stale || trip.error) ? (
-          <Freshness trip={trip} live={!ahead && shown.realtime} time={time} />
+          <Freshness
+            trip={trip}
+            live={!ahead && shown.realtime}
+            time={time}
+            onRefresh={onRefresh}
+          />
         ) : null}
         {ahead ? (
           <View style={[styles.dayPill, { backgroundColor: palette.tint(dayColour, 0.18) }]}>
@@ -134,6 +149,7 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
         <>
           <Pressable
             onPress={() => setShowLegs((v) => !v)}
+            disabled={shown.alerts.length === 0}
             accessibilityRole="button"
             accessibilityState={{ expanded: showLegs }}
             accessibilityLabel={heroLabel(a, ahead, time)}
@@ -154,7 +170,7 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
             </View>
           </Pressable>
 
-          <JourneyBar journey={shown} a={a} time={time} />
+          <Timeline journey={shown} time={time} />
 
           {chips.length > 0 ? (
             <View style={styles.pills}>
@@ -171,7 +187,7 @@ export function TripCard({ trip, now }: { trip: TripState; now: Date }) {
             </View>
           ) : null}
 
-          {showLegs ? <Legs journey={shown} time={time} /> : null}
+          {showLegs ? <Notices journey={shown} /> : null}
         </>
       ) : (
         <EmptyState trip={trip} ahead={ahead} now={now} colour={toneColour} time={time} />
@@ -210,13 +226,14 @@ function LeaveTime({
     unit = period;
   }
   return (
-    <View style={styles.flex}>
-      <Text style={[type.kicker, { color: colour }]}>
-        {!countdown ? 'LEAVE AT' : a.toLeave <= 0 ? 'GO' : 'LEAVE IN'}
+    // "LEAVE IN" stacked beside the number rather than above it, to save height.
+    <View style={styles.bigRow}>
+      <Text style={[styles.big, { color: colour }]} numberOfLines={1}>
+        {value}
       </Text>
-      <View style={styles.bigRow}>
-        <Text style={[styles.big, { color: colour }]} numberOfLines={1}>
-          {value}
+      <View style={styles.bigSide}>
+        <Text style={[type.kicker, { color: colour }]}>
+          {!countdown ? 'LEAVE AT' : a.toLeave <= 0 ? 'GO' : 'LEAVE IN'}
         </Text>
         {unit ? <Text style={[styles.bigUnit, { color: colour }]}>{unit}</Text> : null}
       </View>
@@ -291,10 +308,12 @@ function Freshness({
   trip,
   live,
   time,
+  onRefresh,
 }: {
   trip: TripState;
   live: boolean;
   time: (d: Date) => string;
+  onRefresh: () => void;
 }) {
   const { colors } = useTheme();
   const { tones } = useCommutePalette();
@@ -302,91 +321,123 @@ function Freshness({
   const bad = trip.stale || !!trip.error;
   const colour = bad ? tones.late : live ? tones.good : colors.faint;
   return (
-    <View style={styles.fresh}>
+    <Pressable
+      onPress={onRefresh}
+      accessibilityRole="button"
+      accessibilityLabel={`Updated ${time(trip.fetchedAt)}. Refresh`}
+      hitSlop={12}
+      style={({ pressed }) => [styles.fresh, { opacity: pressed || trip.loading ? 0.5 : 1 }]}
+    >
       <View style={[styles.dot, { backgroundColor: colour }]} />
       <Text style={[type.caption, { color: bad ? colour : colors.faint }]} numberOfLines={1}>
         {bad ? `Not updated · ${time(trip.fetchedAt)}` : live ? 'Live' : 'Timetable'}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
 /**
- * The whole trip as one bar, door to door: grey for walking and waiting, line
- * colours for each service, so changes and long legs show at a glance.
+ * The trip as a route line, like a transit map: departure and arrival times on
+ * the left, a thick bar in each service's line colour, stations in bold, the
+ * line and stop count in between, and dotted walks for changes.
  */
-function JourneyBar({
-  journey,
-  a,
-  time,
-}: {
-  journey: Journey;
-  a: Assessment;
-  time: (d: Date) => string;
-}) {
+function Timeline({ journey, time }: { journey: Journey; time: (d: Date) => string }) {
   const { colors } = useTheme();
   const { night, tones, onColour } = useCommutePalette();
-  const minutes = (from: Date, to: Date) => Math.max(0, (to.getTime() - from.getTime()) / 60_000);
-  const walk = night ? colors.faint : '#5A5D63';
-  const wait = night ? colors.divider : '#34363B';
-
-  const segments: { flex: number; colour: string; label: string; darkText: boolean }[] = [];
-  const push = (flex: number, colour: string, label = '', darkText = false) => {
-    if (flex > 0) segments.push({ flex, colour, label, darkText });
-  };
-  let cursor = a.leaveAt;
-  for (const leg of journey.legs) {
-    const start = leg.departEstimated ?? leg.departPlanned;
-    const end = leg.arriveEstimated ?? leg.arrivePlanned;
-    push(minutes(cursor, start), cursor === a.leaveAt ? walk : wait);
-    if (leg.isWalk) push(Math.max(minutes(start, end), leg.durationMinutes), walk);
-    else {
-      push(
-        minutes(start, end),
-        night ? colors.accent : lineColour(leg),
-        leg.line ?? leg.modeName,
-        night || leg.line === 'T1',
-      );
-    }
-    cursor = end;
-  }
-  push(minutes(cursor, a.arriveAt), walk);
-  const total = segments.reduce((sum, s) => sum + s.flex, 0) || 1;
-
   return (
-    <View style={styles.barWrap}>
-      <View style={styles.bar}>
-        {segments.map((s, i) => (
-          <View key={i} style={[styles.segment, { flex: s.flex, backgroundColor: s.colour }]}>
-            {s.label && s.flex / total > 0.12 ? (
-              <Text
-                style={[styles.segmentText, { color: s.darkText ? onColour : '#FFFFFF' }]}
-                numberOfLines={1}
-              >
-                {s.label}
+    <View style={styles.timeline}>
+      {journey.legs.map((leg, i) => {
+        // A change is shown once: the next service's first stop, with the wait.
+        const previous = journey.legs.slice(0, i).findLast((l) => !l.isWalk);
+        const isLast = !journey.legs.slice(i + 1).some((l) => !l.isWalk);
+        if (leg.isWalk) {
+          if (leg.durationMinutes <= 0) return null;
+          return (
+            <View key={i} style={styles.walkRow}>
+              <View style={styles.tlTimes} />
+              <View style={styles.rail}>
+                {[0, 1, 2].map((d) => (
+                  <View key={d} style={[styles.walkDot, { backgroundColor: colors.faint }]} />
+                ))}
+              </View>
+              <Feather name="user" size={13} color={colors.muted} />
+              <Text style={[type.caption, { color: colors.muted }]}>
+                Walk {leg.durationMinutes} min
               </Text>
-            ) : null}
+            </View>
+          );
+        }
+        const colour = night ? colors.accent : lineColour(leg);
+        const darkText = night || leg.line === 'T1';
+        // White stops on the line, as on station maps; dim in night themes.
+        const dot = night ? colors.background : '#FFFFFF';
+        const depart = leg.departEstimated ?? leg.departPlanned;
+        const arrive = leg.arriveEstimated ?? leg.arrivePlanned;
+        const delay = delayMinutes(leg);
+        const platform = platformOf(leg.from);
+        const minutes = Math.round((arrive.getTime() - depart.getTime()) / 60_000);
+        const changeMinutes = previous
+          ? Math.round(
+              (depart.getTime() - (previous.arriveEstimated ?? previous.arrivePlanned).getTime()) /
+                60_000,
+            )
+          : null;
+        return (
+          <View key={i} style={styles.tlLeg}>
+            <View style={[styles.tlTimes, styles.tlTimesLeg]}>
+              <Text
+                style={[styles.tlTime, { color: delay && delay > 0 ? tones.late : colors.text }]}
+              >
+                {time(depart)}
+              </Text>
+              {isLast ? (
+                <Text style={[styles.tlTime, { color: colors.muted }]}>{time(arrive)}</Text>
+              ) : null}
+            </View>
+            <View style={[styles.tlBar, { backgroundColor: colour }]}>
+              <View style={[styles.tlDot, { backgroundColor: dot }]} />
+              {isLast ? <View style={[styles.tlDot, { backgroundColor: dot }]} /> : null}
+            </View>
+            <View style={styles.tlStations}>
+              <Text style={[styles.station, { color: colors.text }]} numberOfLines={1}>
+                {short(leg.from)}
+                {platform ? (
+                  <Text style={[styles.stationPlat, { color: colors.muted }]}>
+                    {`  Plat ${platform}`}
+                  </Text>
+                ) : null}
+                {changeMinutes !== null ? (
+                  <Text style={[styles.stationPlat, { color: colors.faint }]}>
+                    {` · ${changeMinutes} min change`}
+                  </Text>
+                ) : null}
+              </Text>
+              <View style={styles.tlMid}>
+                <View style={[styles.stopsPill, { backgroundColor: colour }]}>
+                  <Text style={[styles.stopsText, { color: darkText ? onColour : '#FFFFFF' }]}>
+                    {leg.line ?? leg.modeName}
+                    {leg.stops > 0 ? ` · ${leg.stops} stop${leg.stops > 1 ? 's' : ''}` : ''}
+                  </Text>
+                </View>
+                <Text
+                  style={[type.caption, styles.flex, { color: colors.faint }]}
+                  numberOfLines={1}
+                >
+                  {minutes} min
+                  {delay && delay > 0 ? (
+                    <Text style={{ color: tones.late }}>{` · ${delay} min late`}</Text>
+                  ) : null}
+                </Text>
+              </View>
+              {isLast ? (
+                <Text style={[styles.station, { color: colors.text }]} numberOfLines={1}>
+                  {short(leg.to)}
+                </Text>
+              ) : null}
+            </View>
           </View>
-        ))}
-      </View>
-      <View style={styles.barLabels}>
-        <View style={styles.barEnd}>
-          <Feather name="home" size={13} color={colors.muted} />
-          <Text style={[type.caption, { color: colors.muted }]}>{time(a.leaveAt)}</Text>
-        </View>
-        <Text style={[type.caption, { color: colors.faint }]} numberOfLines={1}>
-          {Math.round(minutes(a.leaveAt, a.arriveAt))} min
-          {journey.transfers > 0
-            ? ` · ${journey.transfers} change${journey.transfers > 1 ? 's' : ''}`
-            : ' · direct'}
-        </Text>
-        <View style={styles.barEnd}>
-          <Text style={[type.caption, { color: a.spare < 0 ? tones.late : colors.muted }]}>
-            {time(a.arriveAt)}
-          </Text>
-          <Feather name="briefcase" size={13} color={colors.muted} />
-        </View>
-      </View>
+        );
+      })}
     </View>
   );
 }
@@ -428,7 +479,9 @@ function OptionChip({
           ? 'late'
           : ahead
             ? `arr ${time(arrivalOf(journey)).split(' ')[0]}`
-            : `${Math.max(0, a.toLeave)} min`}
+            : a.toLeave <= 0
+              ? 'now'
+              : `${a.toLeave} min`}
       </Text>
     </Pressable>
   );
@@ -472,28 +525,12 @@ function EmptyState({
   );
 }
 
-/** Journey legs and any notices, shown when the big number is tapped. */
-function Legs({ journey, time }: { journey: Journey; time: (d: Date) => string }) {
+/** Service notices for the journey, shown when the big number is tapped. */
+function Notices({ journey }: { journey: Journey }) {
   const { colors } = useTheme();
   const { tones } = useCommutePalette();
   return (
-    <View style={styles.legs}>
-      {journey.legs.map((leg, i) => (
-        <View key={i} style={styles.leg}>
-          {leg.isWalk ? (
-            <Feather name="user" size={14} color={colors.faint} style={styles.legIcon} />
-          ) : (
-            <LineBadge leg={leg} size="small" />
-          )}
-          <Text style={[type.caption, styles.flex, { color: colors.muted }]}>
-            {leg.isWalk
-              ? `Walk ${leg.durationMinutes} min to ${stationOf(leg.to)}`
-              : `${time(leg.departEstimated ?? leg.departPlanned)} ${stationOf(leg.from)}${
-                  platformOf(leg.from) ? ` (Plat ${platformOf(leg.from)})` : ''
-                } → ${time(leg.arriveEstimated ?? leg.arrivePlanned)} ${stationOf(leg.to)}`}
-          </Text>
-        </View>
-      ))}
+    <View style={styles.notices}>
       {journey.alerts.map((alert) => {
         const serious = alert.priority === 'veryHigh' || alert.priority === 'high';
         return (
@@ -501,13 +538,12 @@ function Legs({ journey, time }: { journey: Journey; time: (d: Date) => string }
             key={alert.id}
             onPress={() => alert.url && Linking.openURL(alert.url)}
             accessibilityRole={alert.url ? 'link' : 'text'}
-            style={styles.leg}
+            style={styles.notice}
           >
             <Feather
               name={serious ? 'alert-triangle' : 'info'}
               size={14}
               color={serious ? tones.late : colors.faint}
-              style={styles.legIcon}
             />
             <Text style={[type.caption, styles.flex, { color: colors.muted }]} numberOfLines={2}>
               {alert.title}
@@ -524,8 +560,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   card: {
-    borderRadius: 16,
-    borderLeftWidth: 5,
+    borderRadius: 6,
+    borderLeftWidth: 4,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     gap: 8,
@@ -536,7 +572,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   person: {
-    borderRadius: 999,
+    borderRadius: 4,
     paddingHorizontal: 12,
     paddingVertical: 4,
     maxWidth: '40%',
@@ -551,7 +587,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   dayPill: {
-    borderRadius: 6,
+    borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
@@ -567,8 +603,11 @@ const styles = StyleSheet.create({
   },
   bigRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  bigSide: {
+    paddingBottom: 8,
   },
   big: {
     fontFamily: fonts.light,
@@ -581,12 +620,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   where: {
-    alignItems: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
   },
   platform: {
     borderWidth: 1.5,
-    borderRadius: 10,
+    borderRadius: 6,
     minWidth: 56,
     paddingVertical: 2,
     alignItems: 'center',
@@ -611,7 +651,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderRadius: 999,
+    borderRadius: 4,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
@@ -629,42 +669,88 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  barWrap: {
-    gap: 6,
-  },
-  bar: {
-    flexDirection: 'row',
-    height: 22,
-    borderRadius: 11,
-    overflow: 'hidden',
+  timeline: {
     gap: 2,
   },
-  segment: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 3,
-  },
-  segmentText: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-  },
-  barLabels: {
+  tlLeg: {
     flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 10,
+  },
+  tlTimes: {
+    width: 64,
+  },
+  tlTimesLeg: {
     justifyContent: 'space-between',
+  },
+  tlTime: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    lineHeight: 19,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'right',
+  },
+  tlBar: {
+    width: 10,
+    borderRadius: 3,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 7,
+  },
+  tlDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  tlStations: {
+    flex: 1,
+    gap: 3,
+  },
+  station: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    lineHeight: 19,
+  },
+  stationPlat: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+  },
+  tlMid: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  barEnd: {
+  stopsPill: {
+    borderRadius: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+  },
+  stopsText: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+  },
+  walkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 10,
+    minHeight: 24,
+  },
+  rail: {
+    width: 10,
+    alignItems: 'center',
+    gap: 3,
+  },
+  walkDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 4,
     paddingHorizontal: 8,
     minHeight: 34,
   },
@@ -691,7 +777,7 @@ const styles = StyleSheet.create({
     minWidth: 64,
     height: 46,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: 6,
   },
   badgeText: {
     fontFamily: fonts.medium,
@@ -711,17 +797,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.light,
     fontSize: 24,
   },
-  legs: {
+  notices: {
     gap: 6,
   },
-  leg: {
+  notice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     minHeight: 28,
-  },
-  legIcon: {
-    width: 30,
-    textAlign: 'center',
   },
 });

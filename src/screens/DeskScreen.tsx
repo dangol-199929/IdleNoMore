@@ -5,7 +5,6 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 import PagerView from 'react-native-pager-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DeskControls } from '../components/DeskControls';
 import { EventDetails } from '../components/EventDetails';
 import { EventEditor } from '../components/EventEditor';
 import { ReminderEditor } from '../components/ReminderEditor';
@@ -23,7 +22,7 @@ import { brightnessFor, isDayTime, resolveDisplayMode } from '../services/bright
 import { ThemeContext, fonts, getTheme, spacing } from '../theme';
 import type { AgendaEvent } from '../types/calendar';
 import type { Reminder } from '../types/reminder';
-import type { ModeOverride, PageId } from '../types/settings';
+import type { PageId } from '../types/settings';
 import type { SettingsTab } from './SettingsScreen';
 import { burnInOffset } from '../utils/burnIn';
 import { CalendarPage } from './pages/CalendarPage';
@@ -32,12 +31,6 @@ import { DashboardPage } from './pages/DashboardPage';
 import { PhotosPage } from './pages/PhotosPage';
 import { RemindersPage } from './pages/RemindersPage';
 
-const CONTROLS_TIMEOUT_MS = 6000;
-const NEXT_OVERRIDE: Record<ModeOverride, ModeOverride> = {
-  auto: 'day',
-  day: 'night',
-  night: 'auto',
-};
 
 interface DeskScreenProps {
   onOpenSettings: (tab?: SettingsTab) => void;
@@ -106,7 +99,6 @@ export function DeskScreen({
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [editing, setEditing] = useState<Reminder | 'new' | null>(null);
   const [addingEvent, setAddingEvent] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(false);
   const pager = useRef<PagerView>(null);
   const [lastTouch, setLastTouch] = useState(() => Date.now());
   const goTo = useCallback(
@@ -116,12 +108,6 @@ export function DeskScreen({
     },
     [pages],
   );
-
-  useEffect(() => {
-    if (!controlsVisible) return;
-    const timer = setTimeout(() => setControlsVisible(false), CONTROLS_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [controlsVisible, settings.override, page]);
 
   // Optionally drift to the photo slideshow after a while without a touch.
   const idleMinutes = Math.floor((now.getTime() - lastTouch) / 60000);
@@ -140,16 +126,9 @@ export function DeskScreen({
   }, [shouldAutoSlideshow, goTo]);
 
   const handleBackgroundPress = useCallback(() => {
-    if (nightPreview) {
-      onEndPreview();
-      return;
-    }
-    setControlsVisible((visible) => !visible);
+    // Taps only end a night preview; settings live behind the gear icon.
+    if (nightPreview) onEndPreview();
   }, [nightPreview, onEndPreview]);
-
-  const cycleOverride = useCallback(() => {
-    updateSettings({ override: NEXT_OVERRIDE[settings.override] });
-  }, [settings.override, updateSettings]);
 
   const isLandscape = width > height;
   const padding = isLandscape ? spacing.xl : spacing.lg;
@@ -316,14 +295,16 @@ export function DeskScreen({
           </Text>
         ) : null}
 
-        <DeskControls
-          visible={controlsVisible && !nightPreview}
-          override={settings.override}
-          onCycleOverride={cycleOverride}
-          onOpenSettings={() => onOpenSettings()}
-          message={brightnessError}
-          bottomInset={insets.bottom}
-        />
+        {brightnessError && !nightPreview ? (
+          <Text
+            style={[
+              styles.previewHint,
+              { color: theme.colors.warning, bottom: insets.bottom + spacing.md },
+            ]}
+          >
+            {brightnessError}
+          </Text>
+        ) : null}
       </View>
       <EventDetails event={selectedEvent} onClose={() => setSelectedEvent(null)} />
       <EventEditor

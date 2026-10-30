@@ -1,6 +1,6 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { IconButton, PillButton } from '../../components/ui';
+import { PillButton } from '../../components/ui';
 import { spacing, type, useTheme } from '../../theme';
 import type { CommuteState } from '../useCommute';
 import { TripCard } from './TripCard';
@@ -46,7 +46,6 @@ export function CommutePage({ now, commute, isLandscape, onOpenSettings }: Commu
   }
 
   const columns = isLandscape ? Math.min(2, commute.trips.length) : 1;
-  const loading = commute.trips.some((t) => t.loading);
 
   return (
     <View style={styles.page}>
@@ -57,28 +56,11 @@ export function CommutePage({ now, commute, isLandscape, onOpenSettings }: Commu
               key={trip.schedule.id}
               style={[styles.cell, { flexBasis: `${100 / columns - 3}%` }]}
             >
-              <TripCard trip={trip} now={now} />
+              <TripCard trip={trip} now={now} onRefresh={commute.refresh} />
             </View>
           ))}
         </View>
       </ScrollView>
-      <View style={[styles.footer, { borderTopColor: colors.divider }]}>
-        <Text style={[type.caption, styles.flex, { color: colors.faint }]} numberOfLines={1}>
-          Transport for NSW · estimates, not guarantees
-        </Text>
-        <IconButton
-          icon="refresh-cw"
-          onPress={commute.refresh}
-          accessibilityLabel={loading ? 'Refreshing departures' : 'Refresh departures'}
-          size={18}
-        />
-        <IconButton
-          icon="sliders"
-          onPress={onOpenSettings}
-          accessibilityLabel="Commute settings"
-          size={18}
-        />
-      </View>
     </View>
   );
 }
@@ -104,11 +86,6 @@ const styles = StyleSheet.create({
   },
   cell: {
     flexGrow: 1,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   empty: {
     flex: 1,
